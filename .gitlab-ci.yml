@@ -1,0 +1,35 @@
+# This file is a template, and might need editing before it works on your project.
+# Official language image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/python/tags/
+image: python:latest
+
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# Pip's cache doesn't store the python packages
+# https://pip.pypa.io/en/stable/reference/pip_install/#caching
+#
+# If you want to also cache the installed packages, you have to install
+# them in a virtualenv and cache it as well.
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+stages:
+  - pylint
+
+before_script:
+  - pip3 install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip3 install -r $CI_PROJECT_DIR/requirements.txt
+
+pylint:
+  stage: pylint
+  script:
+    # exit-zero means that the pylint doesn't error trying to write the results to cache
+    - pylint $CI_PROJECT_DIR/discord_bot.py --exit-zero
+    - pylint $CI_PROJECT_DIR/audio.py --exit-zero
