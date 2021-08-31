@@ -21,7 +21,7 @@ class Audio():
     async def create_player(self, song_url, voice, volume=0.3):
         """
         Creates the audio player to allow for playing of youtube videos
-        
+
         Keyword arguments:
         song_url -- youtube URL of the video to take audio from
         voice -- audio channel of the user
@@ -35,7 +35,7 @@ class Audio():
     async def play_audio(self, message: str, channel):
         """
         A very primitive audio player for processing short youtube videos and playing them to the given voice channel
-        
+
         Keyword arguments:
         message -- contains the youtube URL to read
         channel -- audio channel of the user that sent the message
@@ -54,7 +54,7 @@ class Audio():
     def extract_video_title(self, url: str) -> str:
         """
         Gets the video title using lxml
-        
+
         Keyword arguments:
         url -- the URL of the youtube video which is parsed to get the title from XML of the webpage
         """
@@ -63,7 +63,7 @@ class Audio():
         print(''.join(video_title))
         video_title = ''.join(video_title)
         return video_title
-    
+
     async def play_loop(self, channel, song_url):
         """
         Loops whilst the audio is playing, checking the status of the player throughout
@@ -103,7 +103,7 @@ class Audio():
         self.video_title = video_title
         await self.bot.say(f"Now playing {self.video_title}")
         await self.create_player(song_url, voice)
-    
+
     def check_song_list(self):
         """
         Loops over the list of songs in the queue to get rid of the remaining songs
@@ -111,7 +111,7 @@ class Audio():
         for idx in range(len(self.song_list)):
             if idx > 1:
                 self.song_list.pop(idx)
-    
+
     async def check_player_status(self, voice):
         """
         Checks the current status of the audio player to see if it should stop

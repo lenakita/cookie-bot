@@ -29,7 +29,7 @@ class CookieBot(commands.Cog):
             print(f"Exception setting the bot {err}")
         @self.bot.event
         async def on_ready():
-            # required the type argument of 1 to make the presence visible
+            # requires the type argument of 1 to make the presence visible
             await self.bot.change_presence(activity=Game(name="with cookie dough", type=1))
             print(f"Logged in as\n{self.bot.user.name}\n{self.bot.user.id}\n------------")
 
@@ -39,7 +39,7 @@ class CookieBot(commands.Cog):
         """
         self.bot.run(self.bot_token)
 
-    """ 
+    """
     Each command method takes the same parameters:
 
     Keyword arguments:
