@@ -1,5 +1,6 @@
 discord==1.7.3
 lxml==4.6.3
 youtube_dl==2021.6.6
+PyNacl
 pylint==2.10.2
 coverage==5.5
