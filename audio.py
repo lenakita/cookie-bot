@@ -1,125 +1,136 @@
-import asyncio
-import lxml
-import youtube_dl
-from urllib.request import urlretrieve, Request, urlopen
-from urllib.error import HTTPError
+"""
+Contains classes for enabling audio playing for the Discord Bot
+"""
 
-SLEEP_TIME = 1
+import asyncio
+import discord
+import youtube_dl
+
+ytdl_format_options = {
+    'format': 'bestaudio/best',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+ffmpeg_options = {
+    'options': '-vn'
+}
+ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+
+class YTDLSource(discord.PCMVolumeTransformer):
+    """
+    The Youtube Downloader class for handling YT video downloads
+    """
+    def __init__(self, source, *, data, volume=0.5):
+        super().__init__(source, volume)
+        self.data = data
+        self.title = data.get('title')
+        self.url = data.get('url')
+
+    @classmethod
+    async def from_url(cls, url, event_loop=None, stream=False):
+        """
+        Reads a youtube video from a url, downloads it for playing and
+        parses the url to get the video name
+
+        Keyword arguments:
+        url -- the url of the youtube video to parse
+        loop -- whether to loop the video
+        stream -- whether the audio should be streamed rather than downloaded
+
+        Returns:
+        An ffmpeg audio class with the required file that has been downloaded
+        """
+        event_loop = event_loop or asyncio.get_event_loop()
+        data = await event_loop.run_in_executor(
+            None, lambda: ytdl.extract_info(url, download=not stream)
+        )
+
+        if 'entries' in data:
+            # take first item from a playlist
+            data = data['entries'][0]
+
+        filename = data['url'] if stream else ytdl.prepare_filename(data)
+        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class Audio():
+    """
+    Handles all audio methods for the bot
+    """
     def __init__(self, bot):
         self.bot = bot
-
-        self.is_playing = False
-        self.video_title = ""
-
-        self.song_list = []
-        self.stop = False
         self.player = None
-        self.response = ""
+
+    async def join(self, ctx, channel: discord.VoiceChannel):
+        """
+        Gets the bot to join a voice channel
+
+        Keyword arguments:
+        ctx -- the context for the message
+        channel -- the channel to join
+        """
+
+        if ctx.voice_client is not None:
+            return await ctx.voice_client.move_to(channel)
+
+        await channel.connect()
 
     async def create_player(self, song_url, voice, volume=0.3):
         """
         Creates the audio player to allow for playing of youtube videos
-        
+
         Keyword arguments:
         song_url -- youtube URL of the video to take audio from
         voice -- audio channel of the user
         volume -- how loud the bot is when playing the video (default 0.3)
         """
         # the arguments ensure that the bot stays connected, fixes the random stop error
-        self.player = await voice.create_ytdl_player(song_url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+        self.player = await voice.create_ytdl_player(
+            song_url,
+            before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+        )
         self.player.volume = volume
         self.player.start()
 
-    async def play_audio(self, message: str, channel):
+    async def play_audio(self, ctx, url):
         """
-        A very primitive audio player for processing short youtube videos and playing them to the given voice channel
-        
+        A very primitive audio player for processing short youtube videos
+        and playing them to the given voice channel
+
         Keyword arguments:
         message -- contains the youtube URL to read
         channel -- audio channel of the user that sent the message
+
         Returns:
         response -- the message for the bot to send
         """
-        song_url = message.split(" ")[1]
-        self.video_title = self.extract_video_title(song_url)
-        self.song_list.append(song_url)
-        self.stop = False
-        try:
-            await self.play_loop(channel, song_url)
-        except AttributeError as att_err:
-            print('The following attribute error occurred in play_audio {}'.format(att_err))
+        async with ctx.typing():
+            player = await YTDLSource.from_url(url, event_loop=self.bot.loop, stream=True)
+            ctx.voice_client.play(
+                player,
+                after=lambda e: print(f'Player error: {e}') if e else None
+            )
 
-    def extract_video_title(self, url: str) -> str:
+        await ctx.send(f'Now playing: {player.title}')
+
+    async def change_volume(self, ctx, volume: int):
         """
-        Gets the video title using lxml
-        
+        Changes the audio player's volume
+
         Keyword arguments:
-        url -- the URL of the youtube video which is parsed to get the title from XML of the webpage
+        ctx -- the context for the message
+        volume -- the volume, as an integer, to change the bot to
         """
-        youtube = lxml.etree.HTML(urlopen(url).read())
-        video_title = youtube.xpath("//span[@id='eow-title']/@title")
-        print(''.join(video_title))
-        video_title = ''.join(video_title)
-        return video_title
-    
-    async def play_loop(self, channel, song_url):
-        """
-        Loops whilst the audio is playing, checking the status of the player throughout
-        Keyword arguments:
-        voice -- the voice channel to join, a discord.py voice_channel object
-        song_url -- the youtube URL of the audio to play
-        """
-        if not self.is_playing:
-            await self.bot.say(f"Now playing {self.video_title}")
-            voice = await self.bot.join_voice_channel(channel)
-            await self.create_player(song_url, voice)
-            self.is_playing = True
+        # TODO: validate user's rank so people can't randomly change the volume
+        if ctx.voice_client is None:
+            return await ctx.send("Not connected to a voice channel.")
 
-            while self.is_playing:
-                while not self.player.is_done():
-                    await self.check_player_status(voice)
-                self.song_list.pop(0)
-
-                await asyncio.sleep(3)
-
-                if len(self.song_list) > 0:
-                    self.initialise_song(voice)
-                else:
-                    await voice.disconnect()
-                    self.is_playing = False
-        else:
-            self.check_song_list()
-
-    async def initialise_song(self, voice):
-        """
-        Used to create a new player if a song is added to the queue, and none are already present
-        Keyword arguments:
-        voice -- the voice channel to join, a discord.py voice_channel object
-        """
-        song_url = self.song_list[0]
-        video_title = self.extract_video_title(song_url)
-        self.video_title = video_title
-        await self.bot.say(f"Now playing {self.video_title}")
-        await self.create_player(song_url, voice)
-    
-    def check_song_list(self):
-        """
-        Loops over the list of songs in the queue to get rid of the remaining songs
-        """
-        for idx in range(len(self.song_list)):
-            if idx > 1:
-                self.song_list.pop(idx)
-    
-    async def check_player_status(self, voice):
-        """
-        Checks the current status of the audio player to see if it should stop
-        Keyword arguments:
-        voice -- the current voice channel the bot is in
-        """
-        if not self.stop:
-            await asyncio.sleep(SLEEP_TIME)
-        else:
-            await voice.disconnect()
-            self.is_playing = False
+        ctx.voice_client.source.volume = volume / 100
+        await ctx.send(f"Changed volume to {volume}%")
