@@ -29,7 +29,7 @@ class CookieBot(commands.Cog):
             print(f"Exception setting the bot {err}")
         @self.bot.event
         async def on_ready():
-            # required the type argument of 1 to make the presence visible
+            # requires the type argument of 1 to make the presence visible
             await self.bot.change_presence(activity=Game(name="with cookie dough", type=1))
             print(f"Logged in as\n{self.bot.user.name}\n{self.bot.user.id}\n------------")
 
@@ -39,7 +39,7 @@ class CookieBot(commands.Cog):
         """
         self.bot.run(self.bot_token)
 
-    """ 
+    """
     Each command method takes the same parameters:
 
     Keyword arguments:
@@ -52,42 +52,67 @@ class CookieBot(commands.Cog):
     no_pm -- source of message from channel or private message (default True)
     """
     @commands.command(name='test', pass_context=True, no_pm=True)
-    async def test(self, ctx, args=''):
+    async def test(self, ctx):
         """
-        Test method
+        :komicat:
         """
         # FIXME: remove test emoji and find way to parse emoji ID from chat
         #  discord.Emoji docs: https://gist.github.com/scragly/b8d20aece2d058c8c601b44a689a47a0
         await ctx.send("I'm a test cat <a:komicat:882384257455099924>")
 
-    @commands.command(name='request', pass_context=True, no_pm=True)
-    async def yt_player(self, ctx, args=''):
+    @commands.command(name='join', pass_context=True, no_pm=True)
+    async def join(self, ctx):
+        """
+        Has the bot join the requester's channel
+        """
+        message = ctx.message.content
+        channel = ctx.author.voice.channel
+        await self.audio.join(ctx, channel)
+
+    @commands.command(name='play', pass_context=True, no_pm=True)
+    async def yt_player(self, ctx):
         """
         Plays audio from youtube requested in the message
         """
-        message = ctx.message.content
-        channel = ctx.message.author.voice_channel
-        await self.audio.play_audio(message, channel)
+        song_url = ctx.message.content.split(" ")[1]
+        await self.audio.play_audio(ctx, song_url)
+
+    @commands.command(name='volume', pass_context=True, no_pm=True)
+    async def volume(self, ctx):
+        """
+        Changes the volume of the bot to the specified value
+        """
+        volume = ctx.message.content.split(" ")[1]
+        if not volume.isdigit():
+            await ctx.send("That is not a valid volume, please provide an integer")
+            return
+        if int(volume) > 200:
+            await ctx.send("Normalising volume to the maximum of 200%")
+            volume = 200
+        await self.audio.change_volume(ctx, int(volume))
 
     @commands.command(name='stop', pass_context=True, no_pm=True)
-    async def audio_stop(self, ctx, args=''):
+    async def audio_stop(self, ctx):
         """
-        Stops the audio from playing,
-        must be a method as it is a command that needs to overwrite play_audio
+        Stops the audio from playing
+        Must be a method as it is a command that needs to overwrite play_audio
         """
-        self.audio.stop = True
+        await ctx.voice_client.disconnect()
 
-    @commands.command(name='queue', pass_context=True, no_pm=True)
-    async def audio_queue(self, ctx, args=''):
+    @yt_player.before_invoke
+    async def ensure_voice(self, ctx):
         """
-        Adds a song to the queue using the !queue command
+        Ensures that when the youtube player is invoked the requesting user is
+        connected to a voice channel
         """
-        song_url = ctx.message.content.split(" ")[1]
-        # appends the song to the list attribute for use in play_audio
-        self.audio.song_list.append(song_url)
-        # also gets the video title and states the song has been added to the queue
-        video_title = self.audio.extract_video_title(song_url)
-        await ctx.send(f"{video_title} added to the queue")
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await ctx.author.voice.channel.connect()
+            else:
+                await ctx.send("You are not connected to a voice channel.")
+                raise commands.CommandError("Author not connected to a voice channel.")
+        elif ctx.voice_client.is_playing():
+            ctx.voice_client.stop()
 
 
 if __name__ == "__main__":
