@@ -1,15 +1,22 @@
+"""
+A general purpose Discord Bot for playing audio, amongst other things
+"""
+
 import os
 from discord.ext import commands
-from discord import Game, opus
+from discord import Game
 from audio import Audio
 
 class CookieBot(commands.Cog):
-    def __init__(self, key_store_path: str = ''):
-        if not key_store_path:
+    """
+    The main bot class where the commands are defined
+    """
+    def __init__(self, key_store_file: str = ''):
+        if not key_store_file:
             return
 
         keys = []
-        with open(key_store_path, 'r') as key_file:
+        with open(key_store_file, 'r', encoding='utf-8') as key_file:
             keys = key_file.readlines()
             for idx, key in enumerate(keys):
                 keys[idx] = key.split(":")[1].strip()
@@ -21,12 +28,9 @@ class CookieBot(commands.Cog):
         """
         Initialises the bot and sets its presence message
         """
-        try:
-            self.bot = commands.Bot(command_prefix='!')
-            self.bot.add_cog(self)
-            self.audio = Audio(self.bot)
-        except Exception as err:
-            print(f"Exception setting the bot {err}")
+        self.bot = commands.Bot(command_prefix='!')
+        self.bot.add_cog(self)
+        self.audio = Audio(self.bot)
         @self.bot.event
         async def on_ready():
             # requires the type argument of 1 to make the presence visible
@@ -65,7 +69,6 @@ class CookieBot(commands.Cog):
         """
         Has the bot join the requester's channel
         """
-        message = ctx.message.content
         channel = ctx.author.voice.channel
         await self.audio.join(ctx, channel)
 
