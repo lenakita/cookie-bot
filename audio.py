@@ -1,7 +1,10 @@
+"""
+Contains classes for enabling audio playing for the Discord Bot
+"""
+
 import asyncio
 import discord
 import youtube_dl
-from discord.ext import commands
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -22,6 +25,9 @@ ffmpeg_options = {
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 class YTDLSource(discord.PCMVolumeTransformer):
+    """
+    The Youtube Downloader class for handling YT video downloads
+    """
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
         self.data = data
@@ -43,7 +49,9 @@ class YTDLSource(discord.PCMVolumeTransformer):
         An ffmpeg audio class with the required file that has been downloaded
         """
         loop = event_loop or asyncio.get_event_loop()
-        data = await event_loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+        data = await event_loop.run_in_executor(
+            None, lambda: ytdl.extract_info(url, download=not stream)
+        )
 
         if 'entries' in data:
             # take first item from a playlist
@@ -55,7 +63,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 class Audio():
     def __init__(self, bot):
         self.bot = bot
-        self.is_playing = False
+        self.player = None
 
     async def join(self, ctx, channel: discord.VoiceChannel):
         """
@@ -81,13 +89,17 @@ class Audio():
         volume -- how loud the bot is when playing the video (default 0.3)
         """
         # the arguments ensure that the bot stays connected, fixes the random stop error
-        self.player = await voice.create_ytdl_player(song_url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+        self.player = await voice.create_ytdl_player(
+            song_url,
+            before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+        )
         self.player.volume = volume
         self.player.start()
 
     async def play_audio(self, ctx, url):
         """
-        A very primitive audio player for processing short youtube videos and playing them to the given voice channel
+        A very primitive audio player for processing short youtube videos
+        and playing them to the given voice channel
 
         Keyword arguments:
         message -- contains the youtube URL to read
@@ -98,7 +110,10 @@ class Audio():
         """
         async with ctx.typing():
             player = await YTDLSource.from_url(url, event_loop=self.bot.loop, stream=True)
-            ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
+            ctx.voice_client.play(
+                player,
+                after=lambda e: print(f'Player error: {e}') if e else None
+            )
 
         await ctx.send(f'Now playing: {player.title}')
 
