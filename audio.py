@@ -48,7 +48,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         Returns:
         An ffmpeg audio class with the required file that has been downloaded
         """
-        loop = event_loop or asyncio.get_event_loop()
+        event_loop = event_loop or asyncio.get_event_loop()
         data = await event_loop.run_in_executor(
             None, lambda: ytdl.extract_info(url, download=not stream)
         )
@@ -61,6 +61,9 @@ class YTDLSource(discord.PCMVolumeTransformer):
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class Audio():
+    """
+    Handles all audio methods for the bot
+    """
     def __init__(self, bot):
         self.bot = bot
         self.player = None
