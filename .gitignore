@@ -1,4 +1,5 @@
 env/
+.venv/
 Icons/
 keys.txt
 __pycache__/*
