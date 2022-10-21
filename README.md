@@ -17,5 +17,5 @@ python3 discord_bot.py
 ```
 
 ## Authors & Contributions
-- Author: @lenakita
+- Author: [lenakita](https://github.com/lenakita)
 - Contributions: [Feature branching workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow)
